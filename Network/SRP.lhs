@@ -12,9 +12,9 @@ preserves the strength and efficiency of the EKE family protocols while fixing s
 of their shortcomings.
 
 > module Network.SRP (
-> 						initiateHost, 
-> 						initiateUser
-> 				   	 ) where
+>                       initiateHost, 
+>                       initiateUser
+>                    ) where
 
 > import qualified Data.Digest.Pure.SHA as SHA
 > import Data.ByteString.Lazy (ByteString)
@@ -64,10 +64,10 @@ The following is a description of SRP-6 and 6a, the latest versions of SRP:
 
 > pad :: Integer -> ByteString
 > pad i = B.append (B.replicate padsize '\0') bytestr_i
->		where
->			bytestr_i = encode i
->			isize = B.length bytestr_i
-> 			padsize = fromIntegral (nsize - isize)
+>       where
+>           bytestr_i = encode i
+>           isize = B.length bytestr_i
+>           padsize = fromIntegral (nsize - isize)
 
   ^    (Modular) Exponentiation
 
@@ -91,10 +91,10 @@ The host then keeps {I, s, v} in its password database.
 > calcx i' s p = sha1 [encode s, encode (sha1 [encode (i' ++ ":" ++ p)])]
 > calcv = (g ^^)
 > passwordDatabase = (i', s', v') where
->						p' = "password"
-> 						i' = "username"
->						s' = 0xBEB25379D1A8581EB5A727673A2441EE
->						v' = calcv (calcx i' s' p') 
+>                       p' = "password"
+>                       i' = "username"
+>                       s' = 0xBEB25379D1A8581EB5A727673A2441EE
+>                       v' = calcv (calcx i' s' p') 
 
 The authentication protocol itself goes as follows:
 
@@ -111,21 +111,21 @@ Host -> User:  s, B = kv + g^b             (sends salt, b = random number)
         Host:  K = H(S)
 
 > calcUserM1AndK i' s a a' b' u p = (m'1, k')
-> 						where
-> 							m'1 = hashInteger [hashInteger [n'] `xor` hashInteger [g], 
->									hashStr [i'], hashInteger [s], a', 
->									b', k']
-> 							k'  = hashInteger [s']
-> 							s' = (b' - (k*g^^x)) ^^ (a + u*x)
-> 							x  = calcx i' s p
+>                       where
+>                           m'1 = hashInteger [hashInteger [n'] `xor` hashInteger [g], 
+>                                   hashStr [i'], hashInteger [s], a', 
+>                                   b', k']
+>                           k'  = hashInteger [s']
+>                           s' = (b' - (k*g^^x)) ^^ (a + u*x)
+>                           x  = calcx i' s p
 
 > calcHostM1AndK i' s b a' b' u v = (m'1, k')
-> 						where
-> 							m'1 = hashInteger [hashInteger [n'] `xor` hashInteger [g], 
->									hashStr [i'], hashInteger [s], a', 
->									b', k']
-> 							k'  = hashInteger [s']
-> 							s' = (a' * (v^^u)) ^^ b
+>                       where
+>                           m'1 = hashInteger [hashInteger [n'] `xor` hashInteger [g], 
+>                                   hashStr [i'], hashInteger [s], a', 
+>                                   b', k']
+>                           k'  = hashInteger [s']
+>                           s' = (a' * (v^^u)) ^^ b
 
 > calcA a = g^^a `mod` n'
 
@@ -133,53 +133,53 @@ Host -> User:  s, B = kv + g^b             (sends salt, b = random number)
 
 
 > userToHost i' a h p = do 
->  			let a' = calcA a
->  			send h [i', show a'] {-I, A-}
->  			(s, b') <- receiveIntegerAndInteger h
->  			let u = sha1 [pad a', pad b']
->  			if ((b' `mod` n') == 0) || (u == 0)
->  				then 
->					do
->						putStrLn "Received a random value b where b mod n == 0 or u == 0"
->  						return Nothing
->  				else
->  					do
->						let (m'1, k') = calcUserM1AndK i' s a a' b' u p
->						send h [show m'1]
->						m'2_from_host <- receiveInteger h
->						let m'2 = hashInteger [a', m'1, k']
->						if m'2 /= m'2_from_host
->							then
->								do
->									putStrLn (show m'2 ++ "/=" ++ show m'2_from_host)
->									return Nothing
->							else
->								return (Just (i', k'))
+>           let a' = calcA a
+>           send h [i', show a'] {-I, A-}
+>           (s, b') <- receiveIntegerAndInteger h
+>           let u = sha1 [pad a', pad b']
+>           if ((b' `mod` n') == 0) || (u == 0)
+>               then 
+>                   do
+>                       putStrLn "Received a random value b where b mod n == 0 or u == 0"
+>                       return Nothing
+>               else
+>                   do
+>                       let (m'1, k') = calcUserM1AndK i' s a a' b' u p
+>                       send h [show m'1]
+>                       m'2_from_host <- receiveInteger h
+>                       let m'2 = hashInteger [a', m'1, k']
+>                       if m'2 /= m'2_from_host
+>                           then
+>                               do
+>                                   putStrLn (show m'2 ++ "/=" ++ show m'2_from_host)
+>                                   return Nothing
+>                           else
+>                               return (Just (i', k'))
 
 
 > hostToUser b h = do
->				let (_,s,v) = passwordDatabase
->				let b' = calcB v b
->				(i', a') <- receiveStringAndInteger h
->				if a' `mod` n' == 0 
->					then
->						return Nothing
->					else
->						do
->							let u = sha1 [pad a', pad b']
->							send h [show s, show b']
->							m'1_from_user <- receiveInteger h
->							let (m'1, k') = calcHostM1AndK i' s b a' b' u v
->							if m'1 /= m'1_from_user
->								then
->									do
->										putStrLn ("->" ++ show m'1 ++ "/=" ++ show m'1_from_user ++ "<-")
->										return Nothing
->								else
->									do
->										let m'2 = hashInteger [a', m'1_from_user, k']
->								 		send h [show m'2]
->										return (Just (i', k'))
+>               let (_,s,v) = passwordDatabase
+>               let b' = calcB v b
+>               (i', a') <- receiveStringAndInteger h
+>               if a' `mod` n' == 0 
+>                   then
+>                       return Nothing
+>                   else
+>                       do
+>                           let u = sha1 [pad a', pad b']
+>                           send h [show s, show b']
+>                           m'1_from_user <- receiveInteger h
+>                           let (m'1, k') = calcHostM1AndK i' s b a' b' u v
+>                           if m'1 /= m'1_from_user
+>                               then
+>                                   do
+>                                       putStrLn ("->" ++ show m'1 ++ "/=" ++ show m'1_from_user ++ "<-")
+>                                       return Nothing
+>                               else
+>                                   do
+>                                       let m'2 = hashInteger [a', m'1_from_user, k']
+>                                       send h [show m'2]
+>                                       return (Just (i', k'))
 
 Now the two parties have a shared, strong session key K. To complete authentication, they need to prove to each other that their keys match. One possible way:
 
@@ -194,80 +194,80 @@ The two parties also employ the following safeguards:
 
 
 > {-main = withSocketsDo $ do
-> 			randomGen <- newStdGen
-> 			let ((a, r1), (b, r2)) = (randomR (3, 1000) randomGen, randomR (3, 1000) randomGen)
->			let (i', s', v') = passwordDatabase
-> 			forkIO $ host
-> 			threadDelay 5000
->			result <- user a
-> 			putStr $ show result
-> 			runtest-}
+>           randomGen <- newStdGen
+>           let ((a, r1), (b, r2)) = (randomR (3, 1000) randomGen, randomR (3, 1000) randomGen)
+>           let (i', s', v') = passwordDatabase
+>           forkIO $ host
+>           threadDelay 5000
+>           result <- user a
+>           putStr $ show result
+>           runtest-}
 
 > initiateHost h = do
-> 			b <- getStdRandom (randomR ((2^512), (2^1024)))
->			putStrLn "Server started, listening"
-> 			--sock <- listenOn (PortNumber 7331)
->			--(h, _, _) <- accept sock
->			hSetBuffering h LineBuffering
->			putStrLn "Server accepted connection"
->			result <- hostToUser b h
->			case result of
->				Nothing -> putStrLn "HOST: WARNING EXPLODING COOKIES"
->				Just (i', k') -> putStrLn ( "HOST: SUCCESS:" ++ show i' ++ "," ++ show k' )
-> 			--sClose sock
->			return result
+>           b <- getStdRandom (randomR ((2^512), (2^1024)))
+>           putStrLn "Server started, listening"
+>           --sock <- listenOn (PortNumber 7331)
+>           --(h, _, _) <- accept sock
+>           hSetBuffering h LineBuffering
+>           putStrLn "Server accepted connection"
+>           result <- hostToUser b h
+>           case result of
+>               Nothing -> putStrLn "HOST: WARNING EXPLODING COOKIES"
+>               Just (i', k') -> putStrLn ( "HOST: SUCCESS:" ++ show i' ++ "," ++ show k' )
+>           --sClose sock
+>           return result
 
 > initiateUser h = do
-> 			a <- getStdRandom (randomR ((2^512), (2^1024)))
-> 			--h <- connectTo "127.0.0.1" (PortNumber 7331)
->			hSetBuffering h LineBuffering
->			result <- userToHost "username" a h "password"
->			putStrLn "Client started, connected"
->			case result of
->				Nothing -> putStrLn "USER: WARNING EXPLODING COOKIES"
->				Just (i', k') -> putStrLn ( "USER: SUCCESS:" ++ show i' ++ "," ++ show k')
->			return result
+>           a <- getStdRandom (randomR ((2^512), (2^1024)))
+>           --h <- connectTo "127.0.0.1" (PortNumber 7331)
+>           hSetBuffering h LineBuffering
+>           result <- userToHost "username" a h "password"
+>           putStrLn "Client started, connected"
+>           case result of
+>               Nothing -> putStrLn "USER: WARNING EXPLODING COOKIES"
+>               Just (i', k') -> putStrLn ( "USER: SUCCESS:" ++ show i' ++ "," ++ show k')
+>           return result
 
 > send h = hPutStrLn h . unwords
 
 > receiveInteger h = do
-> 			line <- hGetLine h
-> 			return (read line :: Integer)
+>           line <- hGetLine h
+>           return (read line :: Integer)
 
 > receiveIntegerAndInteger h = do
-> 			line <- hGetLine h
-> 			let words' = words line
-> 			return (read (words' !! 0) :: Integer, read (words' !! 1) :: Integer)
+>           line <- hGetLine h
+>           let words' = words line
+>           return (read (words' !! 0) :: Integer, read (words' !! 1) :: Integer)
 
 > receiveStringAndInteger h = do
-> 			line <- hGetLine h
-> 			let words' = words line
-> 			return (words' !! 0, read (words' !! 1) :: Integer)
+>           line <- hGetLine h
+>           let words' = words line
+>           return (words' !! 0, read (words' !! 1) :: Integer)
 
 
 
 
-	> instance Arbitrary Char where
-	>     arbitrary     = choose ('\0', '\128')
-	>     coarbitrary c = variant (ord c `rem` 4)
-	> 
-	> 
-	> runtest = do
-	> 		quickCheck prop_SameResult
-	> 		quickCheck prop_NotSameResult
-	> 
-	> prop_SameResult a b i' p s = a > 1 && b>1 ==> calcUserM1AndK i' s a a' b' u p == calcHostM1AndK i' s b a' b' u v
-	> 					where
-	> 						u  = sha1 [pad a', pad b']
-	> 						a' = calcA a
-	> 						b' = calcB v b
-	> 						v = calcv (calcx i' s p) 
-	> prop_NotSameResult a b i' p s p' = a > 1 && b>1 && p /= p' ==> calcUserM1AndK i' s a a' b' u p /= calcHostM1AndK i' s b a' b' u v
-	> 					where
-	> 						u  = sha1 [pad a', pad b']
-	> 						a' = calcA a
-	> 						b' = calcB v b
-	> 						v = calcv (calcx i' s p') 
+    > instance Arbitrary Char where
+    >     arbitrary     = choose ('\0', '\128')
+    >     coarbitrary c = variant (ord c `rem` 4)
+    > 
+    > 
+    > runtest = do
+    >       quickCheck prop_SameResult
+    >       quickCheck prop_NotSameResult
+    > 
+    > prop_SameResult a b i' p s = a > 1 && b>1 ==> calcUserM1AndK i' s a a' b' u p == calcHostM1AndK i' s b a' b' u v
+    >                   where
+    >                       u  = sha1 [pad a', pad b']
+    >                       a' = calcA a
+    >                       b' = calcB v b
+    >                       v = calcv (calcx i' s p) 
+    > prop_NotSameResult a b i' p s p' = a > 1 && b>1 && p /= p' ==> calcUserM1AndK i' s a a' b' u p /= calcHostM1AndK i' s b a' b' u v
+    >                   where
+    >                       u  = sha1 [pad a', pad b']
+    >                       a' = calcA a
+    >                       b' = calcB v b
+    >                       v = calcv (calcx i' s p') 
 
 > -- Daniel Fischer (http://www.mail-archive.com/haskell-cafe@haskell.org/msg08243.html)
 > -- calculate a power with respect to a modulus, first tests and
